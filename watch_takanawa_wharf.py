@@ -26,7 +26,7 @@ NOTIFY_START_HOUR = 0   # 例: 8
 NOTIFY_END_HOUR = 24    # 例: 24
 
 # 予約したい時間帯（スロットの開始時刻）
-SLOT_START_HOUR = 11    # 例: 18
+SLOT_START_HOUR = 18    # 例: 18
 SLOT_END_HOUR = 20      # 例: 20
 
 # タイムゾーン
