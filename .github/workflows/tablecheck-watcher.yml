@@ -27,14 +27,6 @@ jobs:
 
       - name: Run watcher
         env:
-          URL: ${{ secrets.URL }}
-          TARGET_DATE: ${{ secrets.TARGET_DATE }}
-          PARTY: ${{ secrets.PARTY }}
-          START_HOUR: ${{ secrets.START_HOUR }}
-          END_HOUR: ${{ secrets.END_HOUR }}
-          SLOT_START_HOUR: ${{ secrets.SLOT_START_HOUR }}
-          SLOT_END_HOUR: ${{ secrets.SLOT_END_HOUR }}
-          TIMEZONE: ${{ secrets.TIMEZONE }}
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_TO_USER_ID: ${{ secrets.LINE_TO_USER_ID }}
         run: |

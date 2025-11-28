@@ -8,6 +8,46 @@ from dotenv import load_dotenv
 import requests
 import httpx
 
+# ==============================
+# 非シークレット設定（ここを書き換える）
+# ==============================
+
+# 予約ページURL（これも隠したいなら env に移してOK）
+RESERVE_URL = "https://www.tablecheck.com/ja/shops/takanawa-wharf/reserve?utm_source=hp"
+
+# 予約したい日付
+TARGET_DATE = "2025-12-24"
+
+# 大人の人数
+NUM_PEOPLE_ADULT = 2
+
+# 通知を送ってよい時間帯（ローカル時間）
+NOTIFY_START_HOUR = 0   # 例: 8
+NOTIFY_END_HOUR = 24    # 例: 24
+
+# 予約したい時間帯（スロットの開始時刻）
+SLOT_START_HOUR = 11    # 例: 18
+SLOT_END_HOUR = 20      # 例: 20
+
+# タイムゾーン
+TIMEZONE = "Asia/Tokyo"
+
+# 高輪 WHARF 固有の席カテゴリ
+SEAT_CATEGORIES = {
+    "window_1st_couple": {
+        "label": "窓際一列目カップルシート",
+        "service_category": "688ab4fb01b93519106912dd",
+    },
+    "window_2nd_couple": {
+        "label": "窓際二列目カップルシート",
+        "service_category": "688ab5618001bc122c53b18f",
+    },
+    "view_2p_only": {
+        "label": "2名専用ビューシート",
+        "service_category": "6910dba6b600519f9e0efc07",
+    },
+}
+
 
 def within_window(now: datetime, start_h: int, end_h: int) -> bool:
     """start_h <= hour < end_h のとき True"""
@@ -74,7 +114,7 @@ def fetch_timetable(
     csrf_token: str,
     target_date: str,
     service_category: str,
-    num_people_adult: str,
+    num_people_adult: int,
     reserve_url_for_referer: str,
 ) -> dict:
     """TableCheck の timetable API を叩いてJSONを返す"""
@@ -92,7 +132,7 @@ def fetch_timetable(
     }
     params = {
         "authenticity_token": csrf_token,
-        "reservation[num_people_adult]": num_people_adult,
+        "reservation[num_people_adult]": str(num_people_adult),
         "reservation[service_category]": service_category,
         "reservation[start_date]": target_date,
     }
@@ -164,49 +204,16 @@ def line_push(message: str, token: str, to_user_id: str) -> None:
 def main() -> None:
     load_dotenv()
 
-    # ===== .env 読み込み =====
-    reserve_url = os.getenv(
-        "URL",
-        "https://www.tablecheck.com/ja/shops/takanawa-wharf/reserve?utm_source=hp",
-    ).strip()
-    target_date = os.getenv("TARGET_DATE", "").strip() or "2025-12-24"
-    num_people_adult = os.getenv("PARTY", "2").strip()
-
-    # 実行・通知を行ってよい時間帯（ローカル時間）
-    notify_start_hour = int(os.getenv("START_HOUR", "0"))   # 例: 8
-    notify_end_hour = int(os.getenv("END_HOUR", "24"))      # 例: 24
-
-    # 「予約したい時間帯」（スロットの開始時刻ベース）
-    slot_start_hour = int(os.getenv("SLOT_START_HOUR", "18"))  # 例: 18
-    slot_end_hour = int(os.getenv("SLOT_END_HOUR", "20"))      # 例: 20
-
-    tz_name = os.getenv("TIMEZONE", "Asia/Tokyo")
-
+    # シークレットは .env / GitHub Secrets から読む
     line_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "").strip()
     line_to_user = os.getenv("LINE_TO_USER_ID", "").strip()
 
-    # 高輪WHARF 固有の service_category
-    seat_categories = {
-        "window_1st_couple": {
-            "label": "窓際一列目カップルシート",
-            "service_category": "688ab4fb01b93519106912dd",
-        },
-        "window_2nd_couple": {
-            "label": "窓際二列目カップルシート",
-            "service_category": "688ab5618001bc122c53b18f",
-        },
-        "view_2p_only": {
-            "label": "2名専用ビューシート",
-            "service_category": "6910dba6b600519f9e0efc07",
-        },
-    }
-
-    now_local = datetime.now(ZoneInfo(tz_name))
-    # 「通知して良い時間」かどうかで実行可否を決める（＝この時間帯だけチェック＆通知）
-    if not within_window(now_local, notify_start_hour, notify_end_hour):
+    now_local = datetime.now(ZoneInfo(TIMEZONE))
+    # 「通知して良い時間」かどうかで実行可否を決める
+    if not within_window(now_local, NOTIFY_START_HOUR, NOTIFY_END_HOUR):
         print(
             f"[{now_local}] skip (outside notify window "
-            f"{notify_start_hour}-{notify_end_hour})"
+            f"{NOTIFY_START_HOUR}-{NOTIFY_END_HOUR})"
         )
         return
 
@@ -214,24 +221,24 @@ def main() -> None:
     print(f"[{now_str}] start check")
 
     try:
-        session, csrf_token = create_session_and_fetch_csrf(reserve_url)
+        session, csrf_token = create_session_and_fetch_csrf(RESERVE_URL)
     except Exception as e:
         print(f"[ERROR] failed to fetch CSRF token: {e}")
         return
 
     try:
-        timetable_url = build_timetable_url(reserve_url)
+        timetable_url = build_timetable_url(RESERVE_URL)
     except Exception as e:
         print(f"[ERROR] failed to build timetable URL: {e}")
         return
 
     any_available = False
     lines_for_message = [
-        f"【高輪 WHARF】{target_date} "
-        f"{slot_start_hour}:00〜{slot_end_hour}:00 の空き状況",
+        f"【高輪 WHARF】{TARGET_DATE} "
+        f"{SLOT_START_HOUR}:00〜{SLOT_END_HOUR}:00 の空き状況",
     ]
 
-    for key, seat in seat_categories.items():
+    for key, seat in SEAT_CATEGORIES.items():
         label = seat["label"]
         category_id = seat["service_category"]
 
@@ -240,16 +247,16 @@ def main() -> None:
                 session=session,
                 timetable_url=timetable_url,
                 csrf_token=csrf_token,
-                target_date=target_date,
+                target_date=TARGET_DATE,
                 service_category=category_id,
-                num_people_adult=num_people_adult,
-                reserve_url_for_referer=reserve_url,
+                num_people_adult=NUM_PEOPLE_ADULT,
+                reserve_url_for_referer=RESERVE_URL,
             )
             times_sec = extract_available_times(
                 data=data,
-                target_date=target_date,
-                slot_start_hour=slot_start_hour,
-                slot_end_hour=slot_end_hour,
+                target_date=TARGET_DATE,
+                slot_start_hour=SLOT_START_HOUR,
+                slot_end_hour=SLOT_END_HOUR,
             )
         except Exception as e:
             print(f"[ERROR] timetable fetch failed [{label}]: {e}")
@@ -265,7 +272,7 @@ def main() -> None:
 
     if any_available:
         lines_for_message.append("")
-        lines_for_message.append(reserve_url)
+        lines_for_message.append(RESERVE_URL)
         message = "\n".join(lines_for_message)
         line_push(message, token=line_token, to_user_id=line_to_user)
     else:
