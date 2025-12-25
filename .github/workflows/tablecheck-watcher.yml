@@ -2,10 +2,10 @@ name: Tablecheck watcher
 
 on:
   schedule:
-    # 10分ごと
-    - cron: "*/5 * * * *"
-  # 手動実行用
-  workflow_dispatch:
+  #   # 10分ごと
+  #   - cron: "*/5 * * * *"
+  # # 手動実行用
+  # workflow_dispatch:
 
 jobs:
   run:
